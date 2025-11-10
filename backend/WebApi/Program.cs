@@ -20,7 +20,16 @@ Log.Logger = new LoggerConfiguration()
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog(Log.Logger);
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowMyOrigin",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173") // your frontend URL
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
 // JWT configuration
 var jwtOptions = new WebApi.Auth.JwtOptions();
 builder.Configuration.Bind("Jwt", jwtOptions);
@@ -82,6 +91,7 @@ if (app.Environment.IsDevelopment())
 
 // Disabled in dev to avoid proxying to HTTPS without a dev cert
 // app.UseHttpsRedirection();
+app.UseCors("AllowMyOrigin");
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
