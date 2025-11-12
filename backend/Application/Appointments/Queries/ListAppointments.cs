@@ -42,7 +42,8 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
                 a.Department,
                 a.Date,
                 a.StartTime,
-                a.Status
+                a.Status,
+                a.Diagnosis
             })
             .ToListAsync(cancellationToken);
 
@@ -65,17 +66,45 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
             return months > 0 ? $"{years}y {months}m" : $"{years}y";
         }
 
-        var list = raw.Select(a => new AppointmentListItem
-        {
-            Id = a.Id,
-            PatientName = _enc.Decrypt(a.PatientName) ?? a.PatientName,
-            PatientMRNumber = a.PatientMRNumber,
-            Age = AgeFromDob(profiles.FirstOrDefault(p => p.Id == a.PatientProfileId)?.DateOfBirth),
-            DoctorName = _enc.Decrypt(a.DoctorName) ?? a.DoctorName,
-            Department = a.Department,
-            Date = a.Date,
-            StartTime = a.StartTime,
-            Status = a.Status
+        var now = DateTime.Now;
+        var list = raw.Select(a => {
+            var appointmentDateTime = a.Date.ToDateTime(a.StartTime);
+            var status = a.Status;
+            var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
+            
+            // If appointment has diagnosis, it's Completed
+            if (hasDiagnosis)
+            {
+                status = "Completed";
+            }
+            // If appointment is in the past and no diagnosis, mark as Missed
+            else if (appointmentDateTime < now)
+            {
+                status = "Missed";
+            }
+            // If appointment is in the future, mark as Scheduled
+            else if (appointmentDateTime > now)
+            {
+                status = "Scheduled";
+            }
+            // Fallback: If status is empty or null, determine based on date
+            else if (string.IsNullOrWhiteSpace(status))
+            {
+                status = appointmentDateTime > now ? "Scheduled" : "Missed";
+            }
+            
+            return new AppointmentListItem
+            {
+                Id = a.Id,
+                PatientName = _enc.Decrypt(a.PatientName) ?? a.PatientName,
+                PatientMRNumber = a.PatientMRNumber,
+                Age = AgeFromDob(profiles.FirstOrDefault(p => p.Id == a.PatientProfileId)?.DateOfBirth),
+                DoctorName = _enc.Decrypt(a.DoctorName) ?? a.DoctorName,
+                Department = a.Department,
+                Date = a.Date,
+                StartTime = a.StartTime,
+                Status = status
+            };
         }).ToList();
         return list;
     }
@@ -93,6 +122,33 @@ public sealed class GetAppointmentHandler : IRequestHandler<GetAppointmentQuery,
     {
         var a = await _db.Appointments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken);
         if (a == null) return null;
+        
+        var now = DateTime.Now;
+        var appointmentDateTime = a.Date.ToDateTime(a.StartTime);
+        var status = a.Status;
+        var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
+        
+        // If appointment has diagnosis, it's Completed
+        if (hasDiagnosis)
+        {
+            status = "Completed";
+        }
+        // If appointment is in the past and no diagnosis, mark as Missed
+        else if (appointmentDateTime < now)
+        {
+            status = "Missed";
+        }
+        // If appointment is in the future, mark as Scheduled
+        else if (appointmentDateTime > now)
+        {
+            status = "Scheduled";
+        }
+        // Fallback: If status is empty or null, determine based on date
+        else if (string.IsNullOrWhiteSpace(status))
+        {
+            status = appointmentDateTime > now ? "Scheduled" : "Missed";
+        }
+        
         return new AppointmentDetailDto
         {
             Id = a.Id,
@@ -109,7 +165,7 @@ public sealed class GetAppointmentHandler : IRequestHandler<GetAppointmentQuery,
             EndTime = a.EndTime,
             Reason = a.Reason,
             Notes = a.Notes,
-            Status = a.Status,
+            Status = status,
             InvestigationRvg = a.InvestigationRvg,
             InvestigationOpg = a.InvestigationOpg,
             InvestigationCeph = a.InvestigationCeph,

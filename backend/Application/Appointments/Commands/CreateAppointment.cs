@@ -39,11 +39,18 @@ public sealed class CreateAppointmentHandler : IRequestHandler<CreateAppointment
             EndTime = r.EndTime,
             Reason = string.IsNullOrWhiteSpace(r.Reason) ? null : r.Reason.Trim(),
             Notes = string.IsNullOrWhiteSpace(r.Notes) ? null : r.Notes.Trim(),
-            Status = "Upcoming"
+            Status = DetermineInitialStatus(r.Date, r.StartTime)
         };
         _db.Appointments.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
         return entity.Id;
+    }
+
+    private static string DetermineInitialStatus(DateOnly date, TimeOnly startTime)
+    {
+        var appointmentDateTime = date.ToDateTime(startTime);
+        var now = DateTime.Now;
+        return appointmentDateTime > now ? "Scheduled" : "Missed";
     }
 }
 

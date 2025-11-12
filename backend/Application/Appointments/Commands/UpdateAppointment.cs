@@ -44,6 +44,13 @@ public sealed class UpdateAppointmentHandler : IRequestHandler<UpdateAppointment
         if (r.DifferentialDiagnosis != null) entity.DifferentialDiagnosis = r.DifferentialDiagnosis.Trim();
         if (r.Diagnosis != null) entity.Diagnosis = r.Diagnosis.Trim();
         if (r.TreatmentPlan != null) entity.TreatmentPlan = r.TreatmentPlan.Trim();
+        
+        // Automatically set status to "Completed" if diagnosis is saved
+        if (!string.IsNullOrWhiteSpace(r.Diagnosis) && entity.Status != "Completed")
+        {
+            entity.Status = "Completed";
+        }
+        
         entity.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         return true;
