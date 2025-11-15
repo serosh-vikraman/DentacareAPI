@@ -5,7 +5,7 @@ using Shared.Security;
 
 namespace Application.Doctors.Queries;
 
-public sealed record DoctorProfileListItem(Guid Id, string FullName, string? Specialization);
+public sealed record DoctorProfileListItem(Guid Id, string FullName, string? Specialization, Guid UserId);
 
 public sealed class ListDoctorProfilesQuery : IRequest<IReadOnlyList<DoctorProfileListItem>>
 {
@@ -30,12 +30,13 @@ public sealed class ListDoctorProfilesHandler : IRequestHandler<ListDoctorProfil
         var list = await _db.DoctorProfiles
             .Where(d => d.TenantId == tenantId && !d.IsDeleted)
             .OrderBy(d => d.FullName)
-            .Select(d => new { d.Id, d.FullName, d.Specialization })
+            .Select(d => new { d.Id, d.FullName, d.Specialization, d.UserId })
             .ToListAsync(cancellationToken);
         var items = list.Select(d => new DoctorProfileListItem(
             d.Id,
             _enc.Decrypt(d.FullName) ?? d.FullName,
-            d.Specialization
+            d.Specialization,
+            d.UserId
         ));
         if (!string.IsNullOrWhiteSpace(request.Query))
         {

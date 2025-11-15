@@ -72,8 +72,13 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
             var status = a.Status;
             var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
             
-            // If appointment has diagnosis, it's Completed
-            if (hasDiagnosis)
+			// Respect explicit Cancelled status from DB
+			if (!string.IsNullOrWhiteSpace(status) && string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+			{
+				status = "Cancelled";
+			}
+			// If appointment has diagnosis, it's Completed
+			else if (hasDiagnosis)
             {
                 status = "Completed";
             }
@@ -128,8 +133,13 @@ public sealed class GetAppointmentHandler : IRequestHandler<GetAppointmentQuery,
         var status = a.Status;
         var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
         
-        // If appointment has diagnosis, it's Completed
-        if (hasDiagnosis)
+		// Respect explicit Cancelled status from DB
+		if (!string.IsNullOrWhiteSpace(status) && string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+		{
+			status = "Cancelled";
+		}
+		// If appointment has diagnosis, it's Completed
+		else if (hasDiagnosis)
         {
             status = "Completed";
         }

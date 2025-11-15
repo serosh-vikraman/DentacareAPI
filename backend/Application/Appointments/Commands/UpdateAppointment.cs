@@ -20,6 +20,8 @@ public sealed class UpdateAppointmentHandler : IRequestHandler<UpdateAppointment
     {
         var entity = await _db.Appointments.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken);
         if (entity == null) return false;
+		// Prevent updates once cancelled
+		if (string.Equals(entity.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)) return false;
         var r = request.Request;
         if (!string.IsNullOrWhiteSpace(r.Status)) entity.Status = r.Status.Trim();
         if (r.Reason != null) entity.Reason = r.Reason.Trim();

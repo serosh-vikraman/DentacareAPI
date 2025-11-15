@@ -22,14 +22,14 @@ public static class UserEndpoints
             return Results.Ok(list);
         });
 
-        group.MapGet("/staff", [Authorize(Roles = "Admin,Owner")] async (UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles) =>
+        group.MapGet("/staff", [Authorize(Roles = "Admin,Owner")] async (UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles, Shared.Security.IEncryptionService enc) =>
         {
             var all = users.Users.ToList();
             var doctors = await users.GetUsersInRoleAsync("Dentist");
             var adminId = "admin@dentacare.local";
             var list = all
                 .Where(u => u.Email != adminId && !doctors.Any(d => d.Id == u.Id))
-                .Select(u => new { u.Id, u.FullName, u.Email, u.PhoneNumber, u.PhotoUrl, u.Designation })
+                .Select(u => new { u.Id, FullName = enc.Decrypt(u.FullName) ?? u.FullName, u.Email, u.PhoneNumber, u.PhotoUrl, u.Designation })
                 .ToList();
             return Results.Ok(list);
         });
@@ -119,6 +119,32 @@ public static class UserEndpoints
             return Results.Ok(new { id = profile.Id });
         });
 
+        // Get doctor detail by User Id
+        group.MapGet("/doctors/{id:guid}", [Authorize(Roles = "Admin,Owner,Dentist,Receptionist,Accountant")] async (Guid id, UserManager<ApplicationUser> users, IApplicationDbContext db, IEncryptionService enc) =>
+        {
+            var user = await users.FindByIdAsync(id.ToString());
+            if (user == null) return Results.NotFound();
+            var profile = await db.DoctorProfiles.AsNoTracking().FirstOrDefaultAsync(d => d.UserId == user.Id);
+            return Results.Ok(new {
+                id = profile?.Id,
+                userId = user.Id,
+                fullName = enc.Decrypt(profile?.FullName) ?? user.FullName,
+                email = user.Email,
+                phone = user.PhoneNumber,
+                specialty = profile?.Specialization ?? user.Specialty,
+                gender = profile?.Gender,
+                dob = profile?.DateOfBirth,
+                photoUrl = user.PhotoUrl ?? profile?.PhotoUrl,
+                address = profile?.Address,
+                emergencyName = profile?.EmergencyContactName,
+                emergencyRelation = profile?.EmergencyContactRelation,
+                emergencyPhone = profile?.EmergencyContactPhone,
+                qualifications = profile?.Qualifications,
+                regno = profile?.MedicalRegistrationNumber,
+                experience = profile?.YearsOfExperience
+            });
+        });
+
         group.MapPut("/doctors/{id:guid}", [Authorize(Roles = "Admin,Owner")] async (Guid id, UserManager<ApplicationUser> users, IApplicationDbContext db, DoctorUpdateRequest req) =>
         {
             var user = await users.FindByIdAsync(id.ToString());
@@ -126,6 +152,22 @@ public static class UserEndpoints
             user.FullName = req.FullName; user.Email = req.Email; user.UserName = req.Email; user.PhoneNumber = req.Phone; user.Specialty = req.Specialty; user.PhotoUrl = req.PhotoUrl;
             var ur = await users.UpdateAsync(user);
             if(!ur.Succeeded) return Results.BadRequest(ur.Errors);
+            if (!string.IsNullOrWhiteSpace(req.Password))
+            {
+                var hasPwd = await users.HasPasswordAsync(user);
+                IdentityResult pr;
+                if (hasPwd)
+                {
+                    // Reset password (admin flow)
+                    await users.RemovePasswordAsync(user);
+                    pr = await users.AddPasswordAsync(user, req.Password);
+                }
+                else
+                {
+                    pr = await users.AddPasswordAsync(user, req.Password);
+                }
+                if (!pr.Succeeded) return Results.BadRequest(pr.Errors);
+            }
             var profile = await db.DoctorProfiles.FirstOrDefaultAsync(d => d.UserId == user.Id);
             if(profile != null){
                 profile.FullName = req.FullName; profile.Gender = req.Gender; profile.DateOfBirth = ParseDate(req.Dob); profile.PhotoUrl = req.PhotoUrl; profile.ContactNumber = req.Phone; profile.Email = req.Email; profile.Address = req.Address; profile.EmergencyContactName = req.EmergencyName; profile.EmergencyContactRelation = req.EmergencyRelation; profile.EmergencyContactPhone = req.EmergencyPhone; profile.Specialization = req.Specialty; profile.Qualifications = req.Qualifications; profile.MedicalRegistrationNumber = req.Regno; profile.YearsOfExperience = req.Experience;

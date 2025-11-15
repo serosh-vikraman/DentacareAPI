@@ -17,12 +17,16 @@ public sealed class DeleteAppointmentHandler : IRequestHandler<DeleteAppointment
 
     public async Task<bool> Handle(DeleteAppointmentCommand request, CancellationToken cancellationToken)
     {
-        var entity = await _db.Appointments.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken);
-        if (entity == null) return false;
-        entity.IsDeleted = true;
-        entity.UpdatedUtc = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
-        return true;
+		var entity = await _db.Appointments.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken);
+		if (entity == null) return false;
+		// Soft-cancel instead of deleting: mark status as Cancelled and keep record
+		if (!string.Equals(entity.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+		{
+			entity.Status = "Cancelled";
+			entity.UpdatedUtc = DateTime.UtcNow;
+			await _db.SaveChangesAsync(cancellationToken);
+		}
+		return true;
     }
 }
 
