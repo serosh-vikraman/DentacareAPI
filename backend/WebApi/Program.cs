@@ -11,6 +11,8 @@ using Microsoft.OpenApi.Models;
 using WebApi.Uploads;
 using WebApi.Services;
 using WebApi.Users;
+using WebApi.Appointments;
+using WebApi.Reports;
 
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
@@ -25,7 +27,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowMyOrigin",
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173") // your frontend URL
+            policy.AllowAnyOrigin()  
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
@@ -103,6 +105,8 @@ app.MapAppointmentEndpoints();
 app.MapUploadEndpoints();
 app.MapUserEndpoints();
 app.MapServiceEndpoints();
+app.MapPaymentEndpoints();
+app.MapReportEndpoints();
 
 // duplicate legacy endpoint removed; use MapPatientEndpoints()
 
