@@ -23,10 +23,15 @@ public static class AppointmentEndpoints
             return one != null ? Results.Ok(one) : Results.NotFound();
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Dentist","Receptionist","Accountant"));
 
-        app.MapPost("/api/appointments", async (CreateAppointmentRequest req, IMediator mediator) =>
+		app.MapPost("/api/appointments", async (CreateAppointmentRequest req, IMediator mediator, Application.Abstractions.IApplicationDbContext db) =>
         {
             var id = await mediator.Send(new CreateAppointmentCommand(req));
-            return Results.Created($"/api/appointments/{id}", new { id });
+			// include patient info for immediate UI updates
+			var info = await db.Appointments.AsNoTracking()
+				.Where(a => a.Id == id)
+				.Select(a => new { a.PatientProfileId, a.PatientMRNumber })
+				.FirstOrDefaultAsync();
+			return Results.Created($"/api/appointments/{id}", new { id, patientProfileId = info?.PatientProfileId, patientMRNumber = info?.PatientMRNumber });
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist"));
 
         app.MapPut("/api/appointments/{id:guid}", async (Guid id, UpdateAppointmentRequest req, IMediator mediator) =>

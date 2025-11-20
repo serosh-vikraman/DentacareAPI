@@ -119,8 +119,8 @@ public sealed class SavePatientProfileHandler : IRequestHandler<SavePatientProfi
 
     private static async Task<string> GenerateNextMrNumber(IApplicationDbContext db, Guid tenantId, CancellationToken ct)
     {
-        // naive approach: count existing; for production use a separate sequence table with concurrency control
-        var count = await db.PatientProfiles.CountAsync(ct);
+		// naive approach: tenant-scoped count; for production use a sequence with concurrency control
+		var count = await db.PatientProfiles.Where(p => p.TenantId == tenantId).CountAsync(ct);
         var next = count + 1;
         return next.ToString("D6");
     }
