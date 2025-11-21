@@ -10,8 +10,19 @@ public static class ReportEndpoints
 		app.MapGet("/api/reports/service-income", async (string? start, string? end, Application.Abstractions.IApplicationDbContext db, ICurrentUserService current) =>
 		{
 			var tenantId = current.TenantId ?? Guid.Empty;
-			if (!DateOnly.TryParse(start ?? "", out var s)) s = DateOnly.FromDateTime(DateTime.UtcNow);
-			if (!DateOnly.TryParse(end ?? "", out var e)) e = s;
+			DateOnly s;
+			DateOnly e;
+			// robust parsing for yyyy-MM-dd
+			if (!DateOnly.TryParse(start ?? "", out s))
+			{
+				try { s = DateOnly.ParseExact(start ?? "", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture); }
+				catch { s = DateOnly.FromDateTime(DateTime.UtcNow); }
+			}
+			if (!DateOnly.TryParse(end ?? "", out e))
+			{
+				try { e = DateOnly.ParseExact(end ?? "", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture); }
+				catch { e = s; }
+			}
 			if (e < s) e = s;
 
 			var rows = await (from pay in db.AppointmentPayments
@@ -41,7 +52,7 @@ public static class ReportEndpoints
 				.ToList();
 
 			return Results.Ok(grouped);
-		}).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Accountant","Receptionist"));
+		}).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Accountant","Receptionist","Dentist"));
 
 		return app;
 	}

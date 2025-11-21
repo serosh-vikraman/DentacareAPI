@@ -22,15 +22,35 @@ public static class UserEndpoints
             return Results.Ok(list);
         });
 
-        group.MapGet("/staff", [Authorize(Roles = "Admin,Owner")] async (UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles, Shared.Security.IEncryptionService enc) =>
+		group.MapGet("/staff", [Authorize(Roles = "Admin,Owner")] async (UserManager<ApplicationUser> users, RoleManager<ApplicationRole> roles, Shared.Security.IEncryptionService enc, IApplicationDbContext db) =>
         {
-            var all = users.Users.ToList();
+			var all = users.Users.ToList();
             var doctors = await users.GetUsersInRoleAsync("Dentist");
             var adminId = "admin@dentacare.local";
-            var list = all
-                .Where(u => u.Email != adminId && !doctors.Any(d => d.Id == u.Id))
-                .Select(u => new { u.Id, FullName = enc.Decrypt(u.FullName) ?? u.FullName, u.Email, u.PhoneNumber, u.PhotoUrl, u.Designation })
-                .ToList();
+			// Build profile lookup for names (some historical records may have encrypted names on profile or user)
+			var userIds = all.Select(u => u.Id).ToList();
+			var profiles = await db.StaffProfiles
+				.Where(p => userIds.Contains(p.UserId))
+				.Select(p => new { p.UserId, p.FullName })
+				.ToListAsync();
+			var nameByUserId = profiles.ToDictionary(p => p.UserId, p => p.FullName);
+			string ResolveName(ApplicationUser u)
+			{
+				// Prefer profile full name (decrypt if needed), then user full name (decrypt if needed)
+				if (nameByUserId.TryGetValue(u.Id, out var pfName))
+				{
+					var dec = enc.Decrypt(pfName);
+					if (!string.IsNullOrWhiteSpace(dec)) return dec!;
+					if (!string.IsNullOrWhiteSpace(pfName)) return pfName!;
+				}
+				var uDec = enc.Decrypt(u.FullName);
+				if (!string.IsNullOrWhiteSpace(uDec)) return uDec!;
+				return u.FullName;
+			}
+			var list = all
+				.Where(u => u.Email != adminId && !doctors.Any(d => d.Id == u.Id))
+				.Select(u => new { u.Id, FullName = ResolveName(u), u.Email, u.PhoneNumber, u.PhotoUrl, u.Designation })
+				.ToList();
             return Results.Ok(list);
         });
 
