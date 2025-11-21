@@ -63,6 +63,18 @@ public static class PatientEndpoints
             return one != null ? Results.Ok(one) : Results.NotFound();
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist","Accountant"));
 
+		// Stats: patients registered today (tenant-scoped)
+		app.MapGet("/api/patient-profiles/stats/today", async (Application.Abstractions.IApplicationDbContext db, ICurrentUserService current) =>
+		{
+			var tenantId = current.TenantId ?? Guid.Empty;
+			var startUtc = DateTime.UtcNow.Date;
+			var endUtc = startUtc.AddDays(1);
+			var count = await db.PatientProfiles
+				.Where(p => p.TenantId == tenantId && !p.IsDeleted && p.CreatedUtc >= startUtc && p.CreatedUtc < endUtc)
+				.CountAsync();
+			return Results.Ok(new { count });
+		}).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist","Accountant"));
+
         app.MapDelete("/api/patient-profiles/{id:guid}", async (Guid id, Application.Abstractions.IApplicationDbContext db) =>
         {
             var p = await db.PatientProfiles.FirstOrDefaultAsync(x => x.Id == id);
