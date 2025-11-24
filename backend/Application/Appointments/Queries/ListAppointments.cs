@@ -72,30 +72,10 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
             var status = a.Status;
             var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
             
-			// Respect explicit Cancelled status from DB
-			if (!string.IsNullOrWhiteSpace(status) && string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase))
-			{
-				status = "Cancelled";
-			}
-			// If appointment has diagnosis, it's Completed
-			else if (hasDiagnosis)
+            // Respect explicit status from DB
+            if (string.IsNullOrWhiteSpace(status))
             {
-                status = "Completed";
-            }
-            // If appointment is in the past and no diagnosis, mark as Missed
-            else if (appointmentDateTime < now)
-            {
-                status = "Missed";
-            }
-            // If appointment is in the future, mark as Scheduled
-            else if (appointmentDateTime > now)
-            {
-                status = "Scheduled";
-            }
-            // Fallback: If status is empty or null, determine based on date
-            else if (string.IsNullOrWhiteSpace(status))
-            {
-                status = appointmentDateTime > now ? "Scheduled" : "Missed";
+                 status = "Scheduled";
             }
             
             return new AppointmentListItem
@@ -133,30 +113,10 @@ public sealed class GetAppointmentHandler : IRequestHandler<GetAppointmentQuery,
         var status = a.Status;
         var hasDiagnosis = !string.IsNullOrWhiteSpace(a.Diagnosis);
         
-		// Respect explicit Cancelled status from DB
-		if (!string.IsNullOrWhiteSpace(status) && string.Equals(status, "Cancelled", StringComparison.OrdinalIgnoreCase))
-		{
-			status = "Cancelled";
-		}
-		// If appointment has diagnosis, it's Completed
-		else if (hasDiagnosis)
+        // Respect explicit status from DB
+        if (string.IsNullOrWhiteSpace(status))
         {
-            status = "Completed";
-        }
-        // If appointment is in the past and no diagnosis, mark as Missed
-        else if (appointmentDateTime < now)
-        {
-            status = "Missed";
-        }
-        // If appointment is in the future, mark as Scheduled
-        else if (appointmentDateTime > now)
-        {
-            status = "Scheduled";
-        }
-        // Fallback: If status is empty or null, determine based on date
-        else if (string.IsNullOrWhiteSpace(status))
-        {
-            status = appointmentDateTime > now ? "Scheduled" : "Missed";
+             status = "Scheduled";
         }
         
         return new AppointmentDetailDto

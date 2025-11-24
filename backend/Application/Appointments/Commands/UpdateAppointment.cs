@@ -26,6 +26,7 @@ public sealed class UpdateAppointmentHandler : IRequestHandler<UpdateAppointment
         if (!string.IsNullOrWhiteSpace(r.Status)) entity.Status = r.Status.Trim();
         if (r.Reason != null) entity.Reason = r.Reason.Trim();
         if (r.Notes != null) entity.Notes = r.Notes.Trim();
+
         if (r.InvestigationRvg != null) entity.InvestigationRvg = r.InvestigationRvg.Trim();
         if (r.InvestigationOpg.HasValue) entity.InvestigationOpg = r.InvestigationOpg;
         if (r.InvestigationCeph.HasValue) entity.InvestigationCeph = r.InvestigationCeph;
@@ -36,22 +37,6 @@ public sealed class UpdateAppointmentHandler : IRequestHandler<UpdateAppointment
         if (r.DifferentialDiagnosis != null) entity.DifferentialDiagnosis = r.DifferentialDiagnosis.Trim();
         if (r.Diagnosis != null) entity.Diagnosis = r.Diagnosis.Trim();
         if (r.TreatmentPlan != null) entity.TreatmentPlan = r.TreatmentPlan.Trim();
-        if (r.InvestigationRvg != null) entity.InvestigationRvg = r.InvestigationRvg.Trim();
-        if (r.InvestigationOpg.HasValue) entity.InvestigationOpg = r.InvestigationOpg;
-        if (r.InvestigationCeph.HasValue) entity.InvestigationCeph = r.InvestigationCeph;
-        if (r.InvestigationOcclusal.HasValue) entity.InvestigationOcclusal = r.InvestigationOcclusal;
-        if (r.InvestigationCbct.HasValue) entity.InvestigationCbct = r.InvestigationCbct;
-        if (r.InvestigationBlood != null) entity.InvestigationBlood = r.InvestigationBlood.Trim();
-        if (r.InvestigationOthers != null) entity.InvestigationOthers = r.InvestigationOthers.Trim();
-        if (r.DifferentialDiagnosis != null) entity.DifferentialDiagnosis = r.DifferentialDiagnosis.Trim();
-        if (r.Diagnosis != null) entity.Diagnosis = r.Diagnosis.Trim();
-        if (r.TreatmentPlan != null) entity.TreatmentPlan = r.TreatmentPlan.Trim();
-        
-        // Automatically set status to "Completed" if diagnosis is saved
-        if (!string.IsNullOrWhiteSpace(r.Diagnosis) && entity.Status != "Completed")
-        {
-            entity.Status = "Completed";
-        }
         
         entity.UpdatedUtc = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
