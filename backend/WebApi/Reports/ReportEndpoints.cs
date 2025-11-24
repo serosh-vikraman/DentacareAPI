@@ -25,27 +25,36 @@ public static class ReportEndpoints
 			}
 			if (e < s) e = s;
 
-			var rows = await (from pay in db.AppointmentPayments
-							  join item in db.AppointmentPaymentItems on pay.Id equals item.AppointmentPaymentId
-							  where pay.TenantId == tenantId
-								&& !pay.IsDeleted
-								&& DateOnly.FromDateTime(pay.CreatedUtc) >= s
-								&& DateOnly.FromDateTime(pay.CreatedUtc) <= e
-							  group item by new { D = DateOnly.FromDateTime(pay.CreatedUtc), item.ServiceName } into g
-							  orderby g.Key.D
-							  select new
-							  {
-								  Date = g.Key.D,
-								  Service = g.Key.ServiceName,
-								  Amount = g.Sum(x => (decimal?)x.Amount) ?? 0m
-							  }).ToListAsync();
+			// interpret requested dates in server's local timezone and convert to UTC range
+			var tz = TimeZoneInfo.Local;
+			var startLocal = new DateTime(s.Year, s.Month, s.Day, 0, 0, 0, DateTimeKind.Unspecified);
+			var endLocal = new DateTime(e.Year, e.Month, e.Day, 23, 59, 59, 999, DateTimeKind.Unspecified);
+			var startUtc = TimeZoneInfo.ConvertTimeToUtc(startLocal, tz);
+			var endUtc = TimeZoneInfo.ConvertTimeToUtc(endLocal, tz);
 
-			var grouped = rows
-				.GroupBy(r => r.Date)
+			// fetch raw rows within UTC range, then group by local date in-memory
+			var raw = await (from pay in db.AppointmentPayments
+							 join item in db.AppointmentPaymentItems on pay.Id equals item.AppointmentPaymentId
+							 where (tenantId == Guid.Empty || pay.TenantId == tenantId)
+							   && !pay.IsDeleted
+							   && pay.CreatedUtc >= startUtc
+							   && pay.CreatedUtc <= endUtc
+							 select new
+							 {
+								 pay.CreatedUtc,
+								 item.ServiceName,
+								 item.Amount
+							 }).ToListAsync();
+
+			var grouped = raw
+				.GroupBy(r => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(r.CreatedUtc, tz)))
 				.Select(g => new
 				{
 					date = g.Key.ToString("yyyy-MM-dd"),
-					services = g.Select(x => new { name = x.Service, amount = x.Amount }).OrderByDescending(x => x.amount).ToList(),
+					services = g.GroupBy(x => x.ServiceName)
+								.Select(gg => new { name = gg.Key, amount = gg.Sum(x => x.Amount) })
+								.OrderByDescending(x => x.amount)
+								.ToList(),
 					total = g.Sum(x => x.Amount)
 				})
 				.OrderBy(x => x.date)
