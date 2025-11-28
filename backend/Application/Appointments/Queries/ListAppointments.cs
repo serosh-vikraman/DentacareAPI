@@ -8,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Appointments.Queries;
 
-public sealed record ListAppointmentsQuery(string? Q) : IRequest<IReadOnlyList<AppointmentListItem>>;
+using Application.Common.Models;
+
+public sealed record ListAppointmentsQuery(string? Q, int PageNumber = 1, int PageSize = 20, DateOnly? Date = null) : IRequest<PaginatedList<AppointmentListItem>>;
 public sealed record GetAppointmentQuery(Guid Id) : IRequest<AppointmentDetailDto?>;
 
-public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQuery, IReadOnlyList<AppointmentListItem>>
+public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQuery, PaginatedList<AppointmentListItem>>
 {
     private readonly IApplicationDbContext _db;
     private readonly IEncryptionService _enc;
@@ -22,7 +24,7 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
         _enc = enc;
     }
 
-    public async Task<IReadOnlyList<AppointmentListItem>> Handle(ListAppointmentsQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedList<AppointmentListItem>> Handle(ListAppointmentsQuery request, CancellationToken cancellationToken)
     {
         var q = request.Q?.Trim().ToLowerInvariant();
         var query = _db.Appointments.AsNoTracking();
@@ -31,8 +33,17 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
             query = query.Where(a => a.PatientName.ToLower().Contains(q) || a.DoctorName.ToLower().Contains(q) || (a.PatientMRNumber != null && a.PatientMRNumber.ToLower().Contains(q)));
         }
 
+        if (request.Date.HasValue)
+        {
+            query = query.Where(a => a.Date == request.Date.Value);
+        }
+
+        var count = await query.CountAsync(cancellationToken);
+        
         var raw = await query
             .OrderByDescending(a => a.Date).ThenByDescending(a => a.StartTime)
+            .Skip((request.PageNumber - 1) * request.PageSize)
+            .Take(request.PageSize)
             .Select(a => new {
                 a.Id,
                 a.PatientName,
@@ -77,6 +88,13 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
             {
                  status = "Scheduled";
             }
+
+            // Calculate Missed status dynamically
+            if ((status == "Scheduled" || status == "Upcoming") && 
+                (a.Date < DateOnly.FromDateTime(now) || (a.Date == DateOnly.FromDateTime(now) && a.StartTime < TimeOnly.FromDateTime(now))))
+            {
+                status = "Missed";
+            }
             
             return new AppointmentListItem
             {
@@ -91,7 +109,8 @@ public sealed class ListAppointmentsHandler : IRequestHandler<ListAppointmentsQu
                 Status = status
             };
         }).ToList();
-        return list;
+        
+        return new PaginatedList<AppointmentListItem>(list, count, request.PageNumber, request.PageSize);
     }
 }
 
@@ -117,6 +136,13 @@ public sealed class GetAppointmentHandler : IRequestHandler<GetAppointmentQuery,
         if (string.IsNullOrWhiteSpace(status))
         {
              status = "Scheduled";
+        }
+
+        // Calculate Missed status dynamically
+        if ((status == "Scheduled" || status == "Upcoming") && 
+            (a.Date < DateOnly.FromDateTime(now) || (a.Date == DateOnly.FromDateTime(now) && a.StartTime < TimeOnly.FromDateTime(now))))
+        {
+            status = "Missed";
         }
         
         return new AppointmentDetailDto

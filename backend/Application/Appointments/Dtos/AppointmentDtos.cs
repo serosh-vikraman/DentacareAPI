@@ -45,6 +45,13 @@ public sealed class UpdateAppointmentRequest
     public string? DifferentialDiagnosis { get; set; }
     public string? Diagnosis { get; set; }
     public string? TreatmentPlan { get; set; }
+    public string? Department { get; set; }
+    public Guid? DoctorProfileId { get; set; }
+    public string? DoctorName { get; set; }
+    public string? ConsultMode { get; set; }
+    public DateOnly? Date { get; set; }
+    public TimeOnly? StartTime { get; set; }
+    public TimeOnly? EndTime { get; set; }
 }
 
 public sealed class SavePaymentRequest

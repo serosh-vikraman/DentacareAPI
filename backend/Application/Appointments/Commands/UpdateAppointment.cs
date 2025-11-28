@@ -27,6 +27,14 @@ public sealed class UpdateAppointmentHandler : IRequestHandler<UpdateAppointment
         if (r.Reason != null) entity.Reason = r.Reason.Trim();
         if (r.Notes != null) entity.Notes = r.Notes.Trim();
 
+        if (r.Department != null) entity.Department = r.Department.Trim();
+        if (r.DoctorProfileId.HasValue) entity.DoctorProfileId = r.DoctorProfileId;
+        if (r.DoctorName != null) entity.DoctorName = r.DoctorName.Trim();
+        if (r.ConsultMode != null) entity.ConsultMode = r.ConsultMode.Trim();
+        if (r.Date.HasValue) entity.Date = r.Date.Value;
+        if (r.StartTime.HasValue) entity.StartTime = r.StartTime.Value;
+        if (r.EndTime.HasValue) entity.EndTime = r.EndTime.Value;
+
         if (r.InvestigationRvg != null) entity.InvestigationRvg = r.InvestigationRvg.Trim();
         if (r.InvestigationOpg.HasValue) entity.InvestigationOpg = r.InvestigationOpg;
         if (r.InvestigationCeph.HasValue) entity.InvestigationCeph = r.InvestigationCeph;

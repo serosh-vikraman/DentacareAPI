@@ -51,9 +51,9 @@ public static class PatientEndpoints
             return Results.Ok(new { id = updatedId, message = "Updated successfully" });
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist"));
 
-        app.MapGet("/api/patient-profiles", async (string? q, IMediator mediator) =>
+        app.MapGet("/api/patient-profiles", async (string? q, int? page_number, int? page_size, IMediator mediator) =>
         {
-            var list = await mediator.Send(new ListPatientProfilesQuery(q));
+            var list = await mediator.Send(new ListPatientProfilesQuery(q, page_number ?? 1, page_size ?? 20));
             return Results.Ok(list);
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist","Accountant"));
 

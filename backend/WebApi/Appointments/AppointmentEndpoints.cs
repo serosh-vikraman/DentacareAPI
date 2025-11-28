@@ -11,9 +11,11 @@ public static class AppointmentEndpoints
 {
     public static IEndpointRouteBuilder MapAppointmentEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/appointments", async (string? q, IMediator mediator) =>
+        app.MapGet("/api/appointments", async (string? q, int? page_number, int? page_size, string? date, IMediator mediator) =>
         {
-            var list = await mediator.Send(new ListAppointmentsQuery(q));
+            DateOnly? d = null;
+            if (DateOnly.TryParse(date, out var parsed)) d = parsed;
+            var list = await mediator.Send(new ListAppointmentsQuery(q, page_number ?? 1, page_size ?? 20, d));
             return Results.Ok(list);
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Dentist","Receptionist","Accountant"));
 
@@ -31,7 +33,27 @@ public static class AppointmentEndpoints
 				.Where(a => a.Id == id)
 				.Select(a => new { a.PatientProfileId, a.PatientMRNumber })
 				.FirstOrDefaultAsync();
-			return Results.Created($"/api/appointments/{id}", new { id, patientProfileId = info?.PatientProfileId, patientMRNumber = info?.PatientMRNumber });
+
+            string? age = null;
+            if (info?.PatientProfileId != null)
+            {
+                var dob = await db.PatientProfiles.AsNoTracking()
+                    .Where(p => p.Id == info.PatientProfileId)
+                    .Select(p => p.DateOfBirth)
+                    .FirstOrDefaultAsync();
+                
+                if (dob.HasValue)
+                {
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    int years = today.Year - dob.Value.Year;
+                    int months = today.Month - dob.Value.Month;
+                    if (today.Day < dob.Value.Day) months -= 1;
+                    if (months < 0) { months += 12; years -= 1; }
+                    if (years >= 0) age = months > 0 ? $"{years}y {months}m" : $"{years}y";
+                }
+            }
+
+			return Results.Created($"/api/appointments/{id}", new { id, patientProfileId = info?.PatientProfileId, patientMRNumber = info?.PatientMRNumber, age });
         }).RequireAuthorization(policy => policy.RequireRole("Admin","Owner","Receptionist","Dentist"));
 
         app.MapPut("/api/appointments/{id:guid}", async (Guid id, UpdateAppointmentRequest req, IMediator mediator) =>
